@@ -1,18 +1,19 @@
-# This file describes your repository contents.
-# It should return a set of nix derivations
-# and optionally the special attributes `lib`, `modules` and `overlays`.
-# It should NOT import <nixpkgs>. Instead, you should take pkgs as an argument.
-# Having pkgs default to <nixpkgs> is fine though, and it lets you use short
-# commands such as:
-#     nix-build -A mypackage
+let
+  nixosPkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/nixos-22.05.tar.gz" ) {};
+in
+  { pkgs ? nixosPkgs }:
+  let
+    omnetppScope = with pkgs; {
+    } ;
 
-{ pkgs ? import <nixpkgs> { } }:
+    omnetppPkgs =  rec {
+      lib = import ./lib { inherit pkgs; }; # functions
+      modules = import ./modules; # NixOS modules
+      overlays = import ./overlays; # nixpkgs overlays
 
-rec {
-  # The `lib`, `modules`, and `overlay` names are special
-  lib = import ./lib { inherit pkgs; }; # functions
-  modules = import ./modules; # NixOS modules
-  overlays = import ./overlays; # nixpkgs overlays  
+      callPackage = pkgs.newScope (omnetppScope // omnetppPkgs);
+      omnetpp = callPackage ./pkgs/omnetpp {}; # all OMNeT++ versions
+      inet = callPackage ./pkgs/inet { inherit omnetppPkgs; }; # all INET versions
+    };
 
-  omnetpp = pkgs.callPackage ./pkgs/omnetpp {}; # all OMNeT++ versions
-}
+  in omnetppPkgs
