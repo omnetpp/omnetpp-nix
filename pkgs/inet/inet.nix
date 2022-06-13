@@ -1,7 +1,7 @@
 { 
   pname, version, url, sha256,      # direct parameters
   stdenv, lib, fetchurl, lld,       # build environment
-  omnetpp,                          # dependencies
+  perl, omnetpp,                          # dependencies
 }:
 let
 in
@@ -18,21 +18,18 @@ stdenv.mkDerivation rec {
   buildInputs = [ omnetpp ];
 
   # tools required for build only (not needed in derivations)
-  nativeBuildInputs = [ omnetpp lld ];
+  nativeBuildInputs = [ omnetpp ];
 
   # tools required for build only (needed in derivations)
-  propagatedNativeBuildInputs = [ ];
+  propagatedNativeBuildInputs = [  ];
 
   # we have to patch all shebangs to use NIX versions of the interpreters
   prePatch = ''
     patchShebangs bin
   '';
 
-  preConfigure = ''
-    source setenv
-  '';
-
   buildPhase = ''
+    source setenv
     opp_featuretool disable all
     make makefiles
     make MODE=release -j16
@@ -42,6 +39,8 @@ stdenv.mkDerivation rec {
     runHook preInstall
 
     mkdir -p ${placeholder "out"}
+    # get rid of precompiled headers to remove dependency from gcc/clang
+    rm -f src/inet/common/precompiled_release.h.pch* src/inet/common/precompiled_debug.h.pch*
 
     installFiles=(bin src python Makefile Version setenv .oppbuildspec .oppfeatures .oppfeaturestate)
     for f in ''${installFiles[@]}; do
@@ -49,23 +48,8 @@ stdenv.mkDerivation rec {
     done
     echo "src" >${placeholder "out"}/.nedfolders
     grep -E -v 'inet.examples|inet.showcases|inet.tutorials' .nedexclusions >${placeholder "out"}/.nedexclusions
-
+    
     runHook postInstall
-    '';
-
-
-  preFixup = ''
-    (
-      build_pwd=$(pwd)
-      for bin in $(find ${placeholder "out"} -type f -executable); do
-        rpath=$(patchelf --print-rpath $bin  \
-                | sed -E "s,$build_pwd,${placeholder "out"}:,g" \
-               || echo )
-        if [ -n "$rpath" ]; then
-          patchelf --set-rpath "$rpath" $bin
-        fi
-      done
-    )
     '';
 
   shellHook = ''
